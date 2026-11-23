@@ -1,15 +1,10 @@
 {
-  "version": 2,
-  "builds": [
+  "installCommand": "pnpm install --no-frozen-lockfile",
+  "buildCommand": "pnpm run build",
+  "rewrites": [
     {
-      "src": "dist/index.mjs",
-      "use": "@vercel/node"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "dist/index.mjs"
+      "source": "/(.*)",
+      "destination": "/dist/index.mjs"
     }
   ]
 }

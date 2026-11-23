@@ -1,1 +1,357 @@
-vv
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API Liga 1 Indonesia berbasis data resmi iLeague.
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: liga-1
+    description: Jadwal, live score, hasil, klasemen, pemain, dan detail pertandingan BRI Super League
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /liga-1:
+    get:
+      operationId: getLiga1Snapshot
+      tags: [liga-1]
+      summary: Snapshot lengkap kompetisi
+      parameters:
+        - $ref: "#/components/parameters/CompetitionId"
+      responses:
+        "200":
+          description: Snapshot kompetisi
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeagueSnapshot"
+  /liga-1/refresh:
+    post:
+      operationId: refreshLiga1
+      tags: [liga-1]
+      summary: Paksa refresh data dari iLeague
+      parameters:
+        - $ref: "#/components/parameters/CompetitionId"
+      responses:
+        "200":
+          description: Snapshot terbaru
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeagueSnapshot"
+  /liga-1/fixtures:
+    get:
+      operationId: getLiga1Fixtures
+      tags: [liga-1]
+      summary: Jadwal, live score, dan pertandingan selesai
+      parameters:
+        - $ref: "#/components/parameters/CompetitionId"
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [upcoming, live, finished]
+        - name: week
+          in: query
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Daftar pertandingan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/FixtureResponse"
+  /liga-1/live:
+    get:
+      operationId: getLiga1Live
+      tags: [liga-1]
+      summary: Pertandingan yang sedang live
+      parameters:
+        - $ref: "#/components/parameters/CompetitionId"
+      responses:
+        "200":
+          description: Live score
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  fetchedAt: { type: string, format: date-time }
+                  refreshIntervalSeconds: { type: integer }
+                  live:
+                    type: array
+                    items: { $ref: "#/components/schemas/Match" }
+                required: [fetchedAt, refreshIntervalSeconds, live]
+  /liga-1/standings:
+    get:
+      operationId: getLiga1Standings
+      tags: [liga-1]
+      summary: Klasemen kompetisi
+      parameters:
+        - $ref: "#/components/parameters/CompetitionId"
+      responses:
+        "200":
+          description: Klasemen
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  standings:
+                    type: array
+                    items: { $ref: "#/components/schemas/Standing" }
+                required: [standings]
+  /liga-1/top-scorers:
+    get:
+      operationId: getLiga1TopScorers
+      tags: [liga-1]
+      summary: Top scorer dan assist
+      parameters:
+        - $ref: "#/components/parameters/CompetitionId"
+      responses:
+        "200":
+          description: Ranking pemain
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  topScorers:
+                    type: array
+                    items: { $ref: "#/components/schemas/RankedPlayer" }
+                  topAssists:
+                    type: array
+                    items: { $ref: "#/components/schemas/RankedPlayer" }
+                required: [topScorers, topAssists]
+  /liga-1/clubs:
+    get:
+      operationId: getLiga1Clubs
+      tags: [liga-1]
+      summary: Daftar klub dan URL logo
+      parameters:
+        - $ref: "#/components/parameters/CompetitionId"
+      responses:
+        "200":
+          description: Daftar klub
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  clubs:
+                    type: array
+                    items: { $ref: "#/components/schemas/Team" }
+                required: [clubs]
+  /liga-1/matches/{matchId}:
+    get:
+      operationId: getLiga1MatchDetail
+      tags: [liga-1]
+      summary: Detail pertandingan, statistik, linimasa, dan susunan pemain
+      parameters:
+        - $ref: "#/components/parameters/CompetitionId"
+        - name: matchId
+          in: path
+          required: true
+          schema: { type: string }
+      responses:
+        "200":
+          description: Detail pertandingan
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/MatchDetail"
+        "404":
+          description: Pertandingan tidak ditemukan
+components:
+  parameters:
+    CompetitionId:
+      name: competitionId
+      in: query
+      required: false
+      description: ID kompetisi iLeague
+      schema:
+        type: string
+        default: BRI_SUPER_LEAGUE_2026-27
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    Team:
+      type: object
+      properties:
+        name: { type: string }
+        code: { type: string }
+        slug: { type: string }
+        logoUrl: { type: string, format: uri }
+      required: [name]
+    Match:
+      type: object
+      properties:
+        id: { type: string }
+        competitionId: { type: string }
+        matchweek: { type: integer }
+        status: { type: string, enum: [upcoming, live, finished, postponed, unknown] }
+        date: { type: string }
+        kickoff: { type: string }
+        kickoffIso: { type: string, format: date-time }
+        timezone: { type: string, example: Asia/Jakarta }
+        venue: { type: string }
+        broadcaster: { type: string }
+        home: { $ref: "#/components/schemas/Team" }
+        away: { $ref: "#/components/schemas/Team" }
+        score:
+          type: object
+          properties:
+            home: { type: integer }
+            away: { type: integer }
+          required: [home, away]
+        sourceUrl: { type: string, format: uri }
+        updatedAt: { type: string, format: date-time }
+      required: [id, competitionId, status, timezone, home, away, sourceUrl, updatedAt]
+    Standing:
+      type: object
+      properties:
+        position: { type: integer }
+        team: { $ref: "#/components/schemas/Team" }
+        played: { type: integer }
+        won: { type: integer }
+        drawn: { type: integer }
+        lost: { type: integer }
+        goalsFor: { type: integer }
+        goalsAgainst: { type: integer }
+        goalDifference: { type: integer }
+        points: { type: integer }
+      required: [position, team, played, won, drawn, lost, goalsFor, goalsAgainst, goalDifference, points]
+    RankedPlayer:
+      type: object
+      properties:
+        rank: { type: integer }
+        name: { type: string }
+        team: { $ref: "#/components/schemas/Team" }
+        photoUrl: { type: string, format: uri }
+        value: { type: integer }
+        metric: { type: string }
+        sourceUrl: { type: string, format: uri }
+      required: [rank, name, metric]
+    MatchDetail:
+      allOf:
+        - $ref: "#/components/schemas/Match"
+        - type: object
+          properties:
+            attendance: { type: integer }
+            timeline:
+              type: array
+              items:
+                type: object
+                properties:
+                  minute: { type: string }
+                  type: { type: string }
+                  team: { type: string, enum: [home, away] }
+                  player: { type: string }
+                  assist: { type: string }
+                  detail: { type: string }
+                required: [type]
+            statistics:
+              type: array
+              items:
+                type: object
+                properties:
+                  metric: { type: string }
+                  home: { type: string }
+                  away: { type: string }
+                required: [metric]
+            lineups:
+              type: array
+              items:
+                type: object
+                properties:
+                  team: { type: string, enum: [home, away] }
+                  position: { type: string }
+                  player: { type: string }
+                  number: { type: string }
+                  starter: { type: boolean }
+                  photoUrl: { type: string, format: uri }
+                required: [team, position, player, starter]
+            rawSource: { type: string, format: uri }
+          required: [timeline, statistics, lineups, rawSource]
+    LeagueSnapshot:
+      type: object
+      properties:
+        competition:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            sourceUrl: { type: string, format: uri }
+          required: [id, name, sourceUrl]
+        fetchedAt: { type: string, format: date-time }
+        nextRefreshAt: { type: string, format: date-time }
+        refreshIntervalSeconds: { type: integer }
+        source: { type: string, enum: [ileague.id] }
+        selectedMatchweek: { type: integer }
+        upcomingMatchweek: { type: integer }
+        matches:
+          type: array
+          items: { $ref: "#/components/schemas/Match" }
+        upcoming:
+          type: array
+          items: { $ref: "#/components/schemas/Match" }
+        live:
+          type: array
+          items: { $ref: "#/components/schemas/Match" }
+        finished:
+          type: array
+          items: { $ref: "#/components/schemas/Match" }
+        standings:
+          type: array
+          items: { $ref: "#/components/schemas/Standing" }
+        topScorers:
+          type: array
+          items: { $ref: "#/components/schemas/RankedPlayer" }
+        topAssists:
+          type: array
+          items: { $ref: "#/components/schemas/RankedPlayer" }
+        clubs:
+          type: array
+          items: { $ref: "#/components/schemas/Team" }
+        stale: { type: boolean }
+        warning: { type: string }
+      required: [competition, fetchedAt, nextRefreshAt, refreshIntervalSeconds, source, matches, upcoming, live, finished, standings, topScorers, topAssists, clubs]
+    FixtureResponse:
+      type: object
+      properties:
+        competition:
+          type: object
+          properties:
+            id: { type: string }
+            name: { type: string }
+            sourceUrl: { type: string, format: uri }
+          required: [id, name, sourceUrl]
+        fetchedAt: { type: string, format: date-time }
+        upcomingMatchweek: { type: integer }
+        count: { type: integer }
+        matches:
+          type: array
+          items: { $ref: "#/components/schemas/Match" }
+      required: [competition, fetchedAt, count, matches]
+
